@@ -27,17 +27,17 @@ button{
     border-radius:8px;
     background:#ff5722;
     color:white;
+    margin:4px;
     touch-action: manipulation;
 }
-.toggle{background:#607d8b;margin-top:5px}
+.toggle{background:#607d8b}
 .panel{
     max-width:420px;
     margin:10px auto;
     background:white;
     padding:10px;
     border-radius:10px;
-    position:relative;
-    z-index:2;
+    display:none;
 }
 .row{
     display:flex;
@@ -83,7 +83,7 @@ button{
 <canvas id="wheel" width="300" height="300"></canvas>
 
 <button id="spinBtn">QUAY 🎯</button>
-<br><br>
+<br>
 <button class="toggle" id="toggleBtn">⚙️ CÀI ĐẶT</button>
 
 <div class="panel" id="panel">
@@ -96,25 +96,39 @@ button{
     <div class="popup-box">
         <h2>🎉 CHÚC MỪNG 🎉</h2>
         <p id="result"></p>
-        <button id="closePopup">OK</button>
+        <button id="closeBtn">OK</button>
     </div>
 </div>
 
 <script>
-const canvas=document.getElementById("wheel");
-const ctx=canvas.getContext("2d");
+/* ===== ELEMENT ===== */
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
 
-let items=[
-    {text:"10k",weight:5},
-    {text:"20k",weight:3},
-    {text:"50k",weight:1},
-    {text:"Chúc may mắn",weight:6}
+const spinBtn = document.getElementById("spinBtn");
+const toggleBtn = document.getElementById("toggleBtn");
+const addBtn = document.getElementById("addBtn");
+
+const panel = document.getElementById("panel");
+const list = document.getElementById("list");
+
+const popupEl = document.getElementById("popup");
+const resultEl = document.getElementById("result");
+const closeBtn = document.getElementById("closeBtn");
+
+/* ===== DATA ===== */
+let items = [
+    {text:"10k", weight:5},
+    {text:"20k", weight:3},
+    {text:"50k", weight:1},
+    {text:"Chúc may mắn", weight:6}
 ];
 
-const colors=["#f44336","#4caf50","#2196f3","#ffeb3b","#9c27b0"];
-let currentAngle=0;
+const colors = ["#f44336","#4caf50","#2196f3","#ffeb3b","#9c27b0"];
+let currentAngle = 0;
+let spinning = false;
 
-// ===== PANEL =====
+/* ===== PANEL ===== */
 function togglePanel(){
     panel.style.display = panel.style.display==="none"?"block":"none";
 }
@@ -130,31 +144,31 @@ function renderList(){
              value="${i.weight}"
              oninput="items[${idx}].weight=parseFloat(this.value)">
             <button class="delete"
-             ontouchstart="removeItem(${idx})"
              onclick="removeItem(${idx})">✖</button>
         </div>`;
     });
 }
 
 function addItem(){
-    items.push({text:"Phần mới",weight:1});
+    items.push({text:"Phần mới", weight:1});
     renderList(); drawWheel();
 }
 function removeItem(i){
+    if(items.length<=2) return;
     items.splice(i,1);
     renderList(); drawWheel();
 }
 
-// ===== VẼ (CHIA ĐỀU) =====
+/* ===== DRAW (CHIA ĐỀU) ===== */
 function drawWheel(){
     ctx.clearRect(0,0,300,300);
-    const slice=Math.PI*2/items.length;
-    let start=0;
+    const slice = Math.PI*2/items.length;
+    let start = 0;
 
     items.forEach((item,i)=>{
         ctx.beginPath();
         ctx.moveTo(150,150);
-        ctx.fillStyle=colors[i%colors.length];
+        ctx.fillStyle = colors[i%colors.length];
         ctx.arc(150,150,150,start,start+slice);
         ctx.fill();
 
@@ -171,29 +185,33 @@ function drawWheel(){
     });
 }
 
-// ===== RANDOM THEO TỈ LỆ =====
+/* ===== RANDOM THEO TỈ LỆ ===== */
 function pickIndex(){
-    let total=items.reduce((s,i)=>s+i.weight,0);
-    let r=Math.random()*total;
-    let acc=0;
+    let total = items.reduce((s,i)=>s+i.weight,0);
+    let r = Math.random()*total;
+    let acc = 0;
     for(let i=0;i<items.length;i++){
         acc+=items[i].weight;
         if(r<=acc) return i;
     }
 }
 
-// ===== QUAY =====
+/* ===== SPIN ===== */
 function spin(){
-    const index=pickIndex();
-    const slice=360/items.length;
-    const target=360*5+(items.length-index)*slice-slice/2;
+    if(spinning) return;
+    spinning = true;
 
-    let start=currentAngle,end=target,startTime=null;
+    const index = pickIndex();
+    const slice = 360/items.length;
+    const target = 360*5 + (items.length-index)*slice - slice/2;
+
+    let start = currentAngle;
+    let startTime = null;
 
     function anim(t){
         if(!startTime) startTime=t;
-        let p=Math.min((t-startTime)/2800,1);
-        let a=start+(end-start)*(1-Math.pow(1-p,3));
+        let p = Math.min((t-startTime)/2800,1);
+        let a = start + (target-start)*(1-Math.pow(1-p,3));
 
         ctx.save();
         ctx.clearRect(0,0,300,300);
@@ -205,36 +223,44 @@ function spin(){
 
         if(p<1) requestAnimationFrame(anim);
         else{
-            currentAngle=a%360;
+            currentAngle = a%360;
+            spinning = false;
             showPopup(items[index].text);
         }
     }
     requestAnimationFrame(anim);
 }
 
-// ===== POPUP =====
+/* ===== POPUP ===== */
 function showPopup(text){
-    result.innerText="Bạn trúng: "+text;
-    popup.style.display="flex";
+    resultEl.innerText = "Bạn trúng: " + text;
+    popupEl.style.display="flex";
 }
-function closePopup(){
-    popup.style.display="none";
+function hidePopup(){
+    popupEl.style.display="none";
 }
 
-// ===== BẮT TOUCH iOS =====
+/* ===== EVENTS (FIX iOS) ===== */
 spinBtn.addEventListener("click", spin);
 spinBtn.addEventListener("touchstart", e=>{e.preventDefault();spin();});
 
-toggleBtn.addEventListener("touchstart", e=>{e.preventDefault();togglePanel();});
 toggleBtn.addEventListener("click", togglePanel);
+toggleBtn.addEventListener("touchstart", e=>{e.preventDefault();togglePanel();});
 
-addBtn.addEventListener("touchstart", e=>{e.preventDefault();addItem();});
 addBtn.addEventListener("click", addItem);
+addBtn.addEventListener("touchstart", e=>{e.preventDefault();addItem();});
 
-closePopup.addEventListener("touchstart", e=>{e.preventDefault();closePopup();});
-closePopup.addEventListener("click", closePopup);
+closeBtn.addEventListener("click", hidePopup);
+closeBtn.addEventListener("touchstart", e=>{e.preventDefault();hidePopup();});
 
-// INIT
+popupEl.addEventListener("click", e=>{
+    if(e.target===popupEl) hidePopup();
+});
+popupEl.addEventListener("touchstart", e=>{
+    if(e.target===popupEl) hidePopup();
+});
+
+/* ===== INIT ===== */
 renderList();
 drawWheel();
 </script>
