@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>Vòng quay may mắn</title>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    background:#f4f4f4;
+    text-align:center;
+    margin:0;
+    padding:10px;
+}
+canvas{
+    display:block;
+    margin:15px auto;
+    touch-action: manipulation;
+}
+button{
+    padding:10px 18px;
+    font-size:15px;
+    border:none;
+    border-radius:8px;
+    background:#ff5722;
+    color:white;
+    touch-action: manipulation;
+}
+.toggle{background:#607d8b;margin-top:5px}
+.panel{
+    max-width:420px;
+    margin:10px auto;
+    background:white;
+    padding:10px;
+    border-radius:10px;
+    position:relative;
+    z-index:2;
+}
+.row{
+    display:flex;
+    gap:6px;
+    margin-bottom:6px;
+}
+.row input{
+    flex:1;
+    padding:6px;
+}
+.small{width:70px}
+.add{background:#4caf50}
+.delete{background:#f44336}
+
+/* POPUP */
+.popup{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.5);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:10;
+}
+.popup-box{
+    background:white;
+    padding:20px;
+    border-radius:12px;
+    text-align:center;
+    animation:scale .25s ease;
+}
+@keyframes scale{
+    from{transform:scale(.7)}
+    to{transform:scale(1)}
+}
+</style>
+</head>
+
+<body>
+
+<h2>🎯 VÒNG QUAY MAY MẮN</h2>
+
+<canvas id="wheel" width="300" height="300"></canvas>
+
+<button id="spinBtn">QUAY 🎯</button>
+<br><br>
+<button class="toggle" id="toggleBtn">⚙️ CÀI ĐẶT</button>
+
+<div class="panel" id="panel">
+    <div id="list"></div>
+    <button class="add" id="addBtn">➕ Thêm phần thưởng</button>
+</div>
+
+<!-- POPUP -->
+<div class="popup" id="popup">
+    <div class="popup-box">
+        <h2>🎉 CHÚC MỪNG 🎉</h2>
+        <p id="result"></p>
+        <button id="closePopup">OK</button>
+    </div>
+</div>
+
+<script>
+const canvas=document.getElementById("wheel");
+const ctx=canvas.getContext("2d");
+
+let items=[
+    {text:"10k",weight:5},
+    {text:"20k",weight:3},
+    {text:"50k",weight:1},
+    {text:"Chúc may mắn",weight:6}
+];
+
+const colors=["#f44336","#4caf50","#2196f3","#ffeb3b","#9c27b0"];
+let currentAngle=0;
+
+// ===== PANEL =====
+function togglePanel(){
+    panel.style.display = panel.style.display==="none"?"block":"none";
+}
+
+function renderList(){
+    list.innerHTML="";
+    items.forEach((i,idx)=>{
+        list.innerHTML+=`
+        <div class="row">
+            <input value="${i.text}"
+             oninput="items[${idx}].text=this.value;drawWheel()">
+            <input class="small" type="number" min="0.1" step="0.1"
+             value="${i.weight}"
+             oninput="items[${idx}].weight=parseFloat(this.value)">
+            <button class="delete"
+             ontouchstart="removeItem(${idx})"
+             onclick="removeItem(${idx})">✖</button>
+        </div>`;
+    });
+}
+
+function addItem(){
+    items.push({text:"Phần mới",weight:1});
+    renderList(); drawWheel();
+}
+function removeItem(i){
+    items.splice(i,1);
+    renderList(); drawWheel();
+}
+
+// ===== VẼ (CHIA ĐỀU) =====
+function drawWheel(){
+    ctx.clearRect(0,0,300,300);
+    const slice=Math.PI*2/items.length;
+    let start=0;
+
+    items.forEach((item,i)=>{
+        ctx.beginPath();
+        ctx.moveTo(150,150);
+        ctx.fillStyle=colors[i%colors.length];
+        ctx.arc(150,150,150,start,start+slice);
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(150,150);
+        ctx.rotate(start+slice/2);
+        ctx.textAlign="right";
+        ctx.font="14px Arial";
+        ctx.fillStyle="#000";
+        ctx.fillText(item.text,140,5);
+        ctx.restore();
+
+        start+=slice;
+    });
+}
+
+// ===== RANDOM THEO TỈ LỆ =====
+function pickIndex(){
+    let total=items.reduce((s,i)=>s+i.weight,0);
+    let r=Math.random()*total;
+    let acc=0;
+    for(let i=0;i<items.length;i++){
+        acc+=items[i].weight;
+        if(r<=acc) return i;
+    }
+}
+
+// ===== QUAY =====
+function spin(){
+    const index=pickIndex();
+    const slice=360/items.length;
+    const target=360*5+(items.length-index)*slice-slice/2;
+
+    let start=currentAngle,end=target,startTime=null;
+
+    function anim(t){
+        if(!startTime) startTime=t;
+        let p=Math.min((t-startTime)/2800,1);
+        let a=start+(end-start)*(1-Math.pow(1-p,3));
+
+        ctx.save();
+        ctx.clearRect(0,0,300,300);
+        ctx.translate(150,150);
+        ctx.rotate(a*Math.PI/180);
+        ctx.translate(-150,-150);
+        drawWheel();
+        ctx.restore();
+
+        if(p<1) requestAnimationFrame(anim);
+        else{
+            currentAngle=a%360;
+            showPopup(items[index].text);
+        }
+    }
+    requestAnimationFrame(anim);
+}
+
+// ===== POPUP =====
+function showPopup(text){
+    result.innerText="Bạn trúng: "+text;
+    popup.style.display="flex";
+}
+function closePopup(){
+    popup.style.display="none";
+}
+
+// ===== BẮT TOUCH iOS =====
+spinBtn.addEventListener("click", spin);
+spinBtn.addEventListener("touchstart", e=>{e.preventDefault();spin();});
+
+toggleBtn.addEventListener("touchstart", e=>{e.preventDefault();togglePanel();});
+toggleBtn.addEventListener("click", togglePanel);
+
+addBtn.addEventListener("touchstart", e=>{e.preventDefault();addItem();});
+addBtn.addEventListener("click", addItem);
+
+closePopup.addEventListener("touchstart", e=>{e.preventDefault();closePopup();});
+closePopup.addEventListener("click", closePopup);
+
+// INIT
+renderList();
+drawWheel();
+</script>
+
+</body>
+</html>
